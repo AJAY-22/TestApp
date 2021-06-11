@@ -5,10 +5,14 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.Manifest;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.ParcelFileDescriptor;
 import android.text.format.DateFormat;
 import android.util.Log;
 import android.view.Display;
@@ -26,13 +30,15 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.lang.ref.WeakReference;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final int FILE_EXPORT_REQUEST_CODE = 12;
     private static final String FILE_NAME = "example.txt";
     private static final int WRITE_EXTERNAL_STORAGE_CODE = 1;
 
-    EditText mEditText;
+    public static EditText mEditText;
     Button mSaveButton, mLoadButton;
 
 
@@ -43,127 +49,70 @@ public class MainActivity extends AppCompatActivity {
 
         mEditText = findViewById(R.id.BigTextET);
         mSaveButton = findViewById(R.id.SaveB);
-        mLoadButton = findViewById(R.id.LoadB);
+//        mLoadButton = findViewById(R.id.LoadB);
     }
 
-    public void save(View V) {
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if(checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED){
-                String[] permissions = {Manifest.permission.WRITE_EXTERNAL_STORAGE};
-                requestPermissions(permissions, WRITE_EXTERNAL_STORAGE_CODE);
-            }
-            else {
-                String text = mEditText.getText().toString();
-                FileOutputStream fos = null;
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
 
-                try {
-                    Context context = getApplicationContext();
-                    File mydir = new File(context.getExternalFilesDir("AppDataNew").getAbsolutePath());
-                    if (!mydir.exists())
-                    {
-                        mydir.mkdirs();
-                        Toast.makeText(getApplicationContext(),"Directory Created",Toast.LENGTH_LONG).show();
-                    }
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK)
+            return;
 
-                    fos = openFileOutput(FILE_NAME, MODE_PRIVATE);
-                    fos.write(text.getBytes());
-                    System.out.println("Written !");
-
-                    mEditText.getText().clear();
-                    Toast.makeText(this, "Saved to" + FILE_NAME, Toast.LENGTH_LONG).show();
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                } finally {
-                    if(fos != null) {
-                        try {
-                            fos.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
+        switch (requestCode) {
+            case FILE_EXPORT_REQUEST_CODE:
+                if (data != null) {
+                    Uri uri = data.getData();
+                    if (uri != null) {
+//                        new ExportTXT(this).execute(uri);
                     }
                 }
-            }
+                break;
         }
-        else {
-            String text = mEditText.getText().toString();
-            FileOutputStream fos = null;
+    }
+
+    public void saveFile(View v) {
+        Intent exportIntent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        exportIntent.addCategory(Intent.CATEGORY_OPENABLE);
+        exportIntent.setType("text/plain");
+        String filename = "test.txt";
+        exportIntent.putExtra(Intent.EXTRA_TITLE, filename);
+        startActivityForResult(exportIntent, FILE_EXPORT_REQUEST_CODE);
+    }
+
+    private class ExportTXT extends AsyncTask<Uri, Void, Boolean>{
+        private final WeakReference<Context> context;
+
+        ExportTXT(Context c) {
+            context = new WeakReference<>(c);
+        }
+
+        @Override
+        protected Boolean doInBackground(Uri... uris) {
+            Uri uri = uris[0];
+            Context c = context.get();
+
+            if( c == null ) {
+                return false;
+            }
+
+            String data = mEditText.getText().toString();
+            boolean success = false;
 
             try {
-                fos = openFileOutput(FILE_NAME, MODE_PRIVATE);
-                fos.write(text.getBytes());
-
-                mEditText.getText().clear();
-                Toast.makeText(this, "Saved to" + getFilesDir() + "/" + FILE_NAME, Toast.LENGTH_LONG).show();
-            } catch (FileNotFoundException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            } finally {
-                if(fos != null) {
-                    try {
-                        fos.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+                ParcelFileDescriptor pfd = c.getContentResolver().openFileDescriptor(uri, "w");
+                if( pfd != null ) {
+                    FileOutputStream fileOutputStream = new FileOutputStream(pfd.getFileDescriptor());
+                    fileOutputStream.write(data.getBytes());
+                    fileOutputStream.close();
+                    success = true;
                 }
             }
+            catch(Exception e) {
+                e.printStackTrace();
+            }
+            return success;
         }
     }
 
-
-    public  void load(View V) {
-        FileInputStream fis = null;
-
-        try {
-            fis = openFileInput(FILE_NAME);
-            InputStreamReader isr = new InputStreamReader(fis);
-            BufferedReader br = new BufferedReader(isr);
-            StringBuilder sb = new StringBuilder();
-            String text;
-
-            while ((text = br.readLine()) != null) {
-                sb.append(text).append("\n");
-            }
-
-            mEditText.setText(sb.toString());
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            if(fis != null) {
-                try {
-                    fis.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-    }
-
-    public  void navuSave(View V) {
-        wrtieFileOnInternalStorage(getApplicationContext(), "NewFile", "finally it happened !");
-    }
-
-    public void wrtieFileOnInternalStorage(Context context,String sFileName, String sBody){
-        try {
-            String h = DateFormat.format("MM-dd-yyyyy-h-mmssaa", System.currentTimeMillis()).toString();
-// this will create a new name every time and unique
-            File root = new File(Environment.getExternalStorageDirectory(), "Notes");
-// if external memory exists and folder with name Notes
-            if (!root.exists()) {
-                root.mkdirs(); // this will create folder.
-            }
-            File filepath = new File(root, h + ".txt"); // file path to save
-            FileWriter writer = new FileWriter(filepath);
-            writer.append(sBody);
-            writer.flush();
-            writer.close();
-            String m = "File generated with name " + h + ".txt";
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
 }
