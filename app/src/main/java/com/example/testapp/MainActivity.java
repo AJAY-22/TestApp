@@ -1,45 +1,27 @@
 package com.example.testapp;
 
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.Manifest;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.ParcelFileDescriptor;
-import android.text.format.DateFormat;
-import android.util.Log;
-import android.view.Display;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Toast;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
 import java.lang.ref.WeakReference;
 
 public class MainActivity extends AppCompatActivity {
 
     private static final int FILE_EXPORT_REQUEST_CODE = 12;
-    private static final String FILE_NAME = "example.txt";
-    private static final int WRITE_EXTERNAL_STORAGE_CODE = 1;
 
-    public static EditText mEditText;
-    Button mSaveButton, mLoadButton;
+    public EditText mEditText;
+    Button mSaveButton;
 
 
     @Override
@@ -49,7 +31,6 @@ public class MainActivity extends AppCompatActivity {
 
         mEditText = findViewById(R.id.BigTextET);
         mSaveButton = findViewById(R.id.SaveB);
-//        mLoadButton = findViewById(R.id.LoadB);
     }
 
     @Override
@@ -59,18 +40,17 @@ public class MainActivity extends AppCompatActivity {
         if (resultCode != RESULT_OK)
             return;
 
-        switch (requestCode) {
-            case FILE_EXPORT_REQUEST_CODE:
-                if (data != null) {
-                    Uri uri = data.getData();
-                    if (uri != null) {
-//                        new ExportTXT(this).execute(uri);
-                    }
+        if (requestCode == FILE_EXPORT_REQUEST_CODE) {
+            if (data != null) {
+                Uri uri = data.getData();
+                if (uri != null) {
+                        new ExportTXT(this).execute(uri);
                 }
-                break;
+            }
         }
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     public void saveFile(View v) {
         Intent exportIntent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         exportIntent.addCategory(Intent.CATEGORY_OPENABLE);
